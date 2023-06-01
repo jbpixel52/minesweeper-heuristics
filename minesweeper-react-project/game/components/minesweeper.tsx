@@ -1,5 +1,6 @@
 type CellStatus = "CLOSED" | "MARKED" | "OPENED";
 type CellValue = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+import { forEachChild } from "typescript";
 import { getRandomNumber } from "./helpers";
 interface Cell {
   status: CellStatus;
@@ -10,18 +11,37 @@ interface Board {
   cells: Cell[][];
 }
 
-export class MinesweeperGame {
-  private board: Board;
-  private size: number;
-  private minesCount: number;
+const propsToSymbol = {
+  CLOSED: "🔒",
+  OPENED: "🔓",
+  MARKED: "🚩",
+  1: "1️⃣",
+  2: "2️⃣",
+  3: "3️⃣",
+  4: "4️⃣",
+  5: "5️⃣",
+  6: "6️⃣",
+  7: "7️⃣",
+  8: "8️⃣",
+};
 
-  constructor(size: number, minesCount: number) {
+export class MinesweeperGame {
+  public board: Board;
+  public size: number;
+  public minesCount: number;
+  public elements: JSX.Element[];
+  constructor(size: number, minesCount: number, _board?: Board) {
     this.size = size;
     this.minesCount = minesCount;
     this.board = this.createBoard();
     this.placeMines();
+    this.elements = this.generateElements();
+    // this.board = typeof(_board)===undefined ? _board : this.createBoard();
   }
 
+  // public exportGame(){
+  //   return new MinesweeperGame(this.size, this.minesCount,this.board)
+  // }
   private createBoard(): Board {
     const cells: Cell[][] = [];
 
@@ -83,22 +103,95 @@ export class MinesweeperGame {
   private isValidCell(x: number, y: number): boolean {
     return x >= 0 && x < this.size && y >= 0 && y < this.size;
   }
-  public randomPlay(_boardSize: number[]): void {
-    const x: number = getRandomNumber(0, _boardSize[0]);
-    const y: number = getRandomNumber(0, _boardSize[1]);
+  public randomMove(): void {
+    const x: number = getRandomNumber(0, this.size);
+    const y: number = getRandomNumber(0, this.size);
     this.play(x, y);
-    this.printBoard();
   }
-  public randomGame() {
+
+  public randomGame(): void {
+    while (this.checkWin() === false) {
+      let x: number = getRandomNumber(0, this.size);
+      let y: number = getRandomNumber(0, this.size);
+      this.solveWithHeuristic();
+      if (this.isValidCell(x, y)) {
+        try {
+          const cell = this.board.cells[x][y];
+          if (cell.status === "OPENED") {
+            console.log("This cell is already opened.");
+            return;
+          }
+
+          if (cell.status === "MARKED") {
+            console.log("You cannot open a marked cell. Unmark it first.");
+            return;
+          }
+
+          cell.status = "OPENED";
+
+          if (cell.value === -1) {
+            console.log("You stepped on a mine! Game over.");
+            console.log(`Mine at [${x},${y}]`);
+            // Implement game over logic here...
+            return;
+          }
+
+          if (cell.value === 0) {
+            this.openNeighbors(x, y);
+          }
+        } catch (error) {
+          //console.error(error);
+          console.error("ERROR PLAYING");
+        }
+      } else {
+        this.solveWithHeuristic();
+        this.randomGame();
+      }
+
+      // Check if the game is won
+      if (this.checkWin()) {
+        console.log("Congratulations! You won the game.");
+        // Implement win logic here...
+        return;
+      }
+    }
   }
-  public renderField(){
-    let elements = [];
-    this.board.cells.map(cell=>{
-      return()
-    })
+
+  public generateElements() {
+    let grid = [];
+    let localBoard: Board = this.board;
+    for (let x = 0; x < this.size; x++) {
+      for (let y = 0; y < this.size; y++) {
+        let cell: Cell = localBoard.cells[x][y];
+        if (cell.status === "MARKED") {
+          grid.push(
+            <div className="border-red-500 border-2">
+              {propsToSymbol.MARKED}
+            </div>
+          );
+        }
+        if (cell.status === "CLOSED") {
+          grid.push(
+            <div className="border-yellow-500 border-2">
+              {propsToSymbol.CLOSED}
+            </div>
+          );
+        }
+        if (cell.status === "OPENED") {
+          grid.push(
+            <div className="border-solid border-green-500 border-2 rounded">
+              {cell.value}
+            </div>
+          );
+        }
+      }
+    }
+    return grid;
+  }
+
   public play(x: number, y: number): void {
-    const cell = this.board.cells[x][y];
-    if (cell.status != undefined) {
+    try {
+      const cell = this.board.cells[x][y];
       if (cell.status === "OPENED") {
         console.log("This cell is already opened.");
         return;
@@ -120,6 +213,9 @@ export class MinesweeperGame {
       if (cell.value === 0) {
         this.openNeighbors(x, y);
       }
+    } catch (error) {
+      //console.error(error);
+      console.error("ERROR PLAYING");
     }
 
     // Check if the game is won
@@ -129,8 +225,7 @@ export class MinesweeperGame {
       return;
     }
 
-    this.printBoard();
-
+    //this.printBoard();
     // Apply the heuristic solver
     this.solveWithHeuristic();
   }
@@ -163,59 +258,32 @@ export class MinesweeperGame {
     return true;
   }
 
-  private solveWithHeuristic(): void {
+  public solveWithHeuristic(): void {
     const solver = new MinesweeperSolver();
     solver.solve(this.board);
   }
 
-  //   public printBoard(): void {
-  //     for (let x = 0; x < this.size; x++) {
-  //       let row = "";
-
-  //       for (let y = 0; y < this.size; y++) {
-  //         const cell = this.board.cells[x][y];
-
-  //         if (cell.status === "CLOSED") {
-  //           row += "▉";
-  //         } else if (cell.status === "MARKED") {
-  //           row += "M";
-  //         } else {
-  //           row += cell.value === -1 ? "*" : cell.value;
-  //         }
-
-  //         row += " ";
-  //       }
-
-  //       console.log(row);
-  //     }
-  //     console.log ('              ');
-  //   }
-  //
-
   public printBoard(): void {
-    const tableData: { [key: string]: string }[] = [];
-
     for (let x = 0; x < this.size; x++) {
-      const row: { [key: string]: string } = {};
+      let row = "";
 
       for (let y = 0; y < this.size; y++) {
         const cell = this.board.cells[x][y];
 
         if (cell.status === "CLOSED") {
-          row[`Cell ${x}-${y}`] = "▉";
+          row += "▉";
         } else if (cell.status === "MARKED") {
-          row[`Cell ${x}-${y}`] = "M";
+          row += "M";
         } else {
-          row[`Cell ${x}-${y}`] = cell.value === -1
-            ? "*"
-            : cell.value.toString();
+          row += cell.value === -1 ? "*" : cell.value;
         }
+
+        row += " ";
       }
 
-      tableData.push(row);
+      console.log(row);
     }
-
-    console.table(tableData);
+    console.log("              ");
   }
 }
 
@@ -275,7 +343,7 @@ class MinesweeperSolver {
     x: number,
     y: number,
     oldStatus: CellStatus,
-    newStatus: CellStatus,
+    newStatus: CellStatus
   ): number {
     let changes = 0;
 
@@ -296,19 +364,15 @@ class MinesweeperSolver {
   }
 
   private isValidCell(board: Board, x: number, y: number): boolean {
-    return x >= 0 && x < board.cells.length && y >= 0 &&
-      y < board.cells[x].length;
+    return (
+      x >= 0 && x < board.cells.length && y >= 0 && y < board.cells[x].length
+    );
   }
 }
 
 // Example usage
-const boardSize = [10, 10];
-const game = new MinesweeperGame(boardSize[0], boardSize[1]);
-game.printBoard();
+//const boardSize = 10;
+// let mineDensity = getRandomNumber(1, boardSize ^ 2);
+// const game = new MinesweeperGame(boardSize, mineDensity);
+// game.printBoard();
 //game.play(0, 0); // Example move
-game.randomPlay(boardSize);
-game.randomPlay(boardSize);
-game.randomPlay(boardSize);
-
-console.log("");
-
