@@ -1,6 +1,6 @@
 type CellStatus = "CLOSED" | "MARKED" | "OPENED";
 type CellValue = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-import { getRandomNumber } from "./helpers.ts";
+import { getRandomNumber } from "./helpers";
 interface Cell {
   status: CellStatus;
   value: CellValue;
